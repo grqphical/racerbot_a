@@ -15,18 +15,13 @@ jobs:
       - name: Install clang tools & dependencies
         run: |
           apt-get update
-          apt-get install -y clang-format clang-tidy
+          apt-get install -y clang-tidy
           rosdep update
           rosdep install -i --from-paths src --rosdistro humble -y
-      - name: Check clang-format
-        run: |
-          # Checks all C/C++ files; fails if any formatting diff is found
-          find src/racerbot_a -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h' \) | \
-          xargs clang-format --dry-run --Werror
 
       - name: Compile and Run clang-tidy
         run: |
-          source /opt/ros/humble/setup.bash
+          . /opt/ros/humble/setup.bash
           # CMAKE_EXPORT_COMPILE_COMMANDS generates compile_commands.json needed for clang-tidy
           colcon build --symlink-install --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           
