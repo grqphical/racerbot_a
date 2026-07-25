@@ -8,7 +8,6 @@ Checks: >
   readability-*,
   -modernize-use-trailing-return-type,
   -readability-magic-numbers
-  clang-analyzer-*
   -cppcoreguidelines-avoid-magic-numbers
 
 WarningsAsErrors: 'bugprone-*,performance-*'
