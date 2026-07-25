@@ -1,18 +1,18 @@
-#include "rclcpp/rclcpp.hpp"
-#include "sensor_msgs/msg/laser_scan.hpp"
-#include "nav_msgs/msg/odometry.hpp"
-#include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
-#include "reactive/msg/gap.hpp"
-#include <vector>
-#include <cmath>
 #include <algorithm>
+#include <cmath>
+#include <vector>
 
-class GapFinderNode : public rclcpp::Node
-{
-public:
+#include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "reactive/msg/gap.hpp"
+#include "sensor_msgs/msg/laser_scan.hpp"
+
+class GapFinderNode : public rclcpp::Node {
+   public:
     GapFinderNode();
 
-private:
+   private:
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_scan_sub_;
     rclcpp::Publisher<reactive::msg::Gap>::SharedPtr gap_pub_;
     double max_lidar_range_;
@@ -34,11 +34,13 @@ private:
     ///        bubble around points closer than a threshold, so the car doesn't clip corners.
     /// @param scan_msg Shared pointer to the incoming LaserScan message.
     /// @param ranges Preprocessed range values to mutate in place, applying obstacle bubbles.
-    void extend_obstacles(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg, std::vector<float> &ranges);
+    void extend_obstacles(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg,
+                          std::vector<float> &ranges);
 
     /// @brief Finds the indices of the furthest gap of the ranges array to steer toward.
     /// @param scan_msg Shared pointer to the incoming LaserScan message.
     /// @param ranges Ranges array (after obstacle extension) to search for the best gap.
     /// @return Indices into ranges corresponding to the furthest gap.
-    std::pair<int, int> find_furthest_gap(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg, std::vector<float> &ranges);
+    std::pair<int, int> find_furthest_gap(
+        const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg, std::vector<float> &ranges);
 };

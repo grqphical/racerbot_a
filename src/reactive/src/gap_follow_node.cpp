@@ -1,14 +1,12 @@
 #include "gap_follow_node.hpp"
 
-GapFollowNode::GapFollowNode() : Node("gap_follow_node")
-{
+GapFollowNode::GapFollowNode() : Node("gap_follow_node") {
     RCLCPP_INFO(this->get_logger(), "Gap Follow node started");
 
     drive_pub_ = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("drive", 10);
 
     gap_sub_ = this->create_subscription<reactive::msg::Gap>(
-        "gap", 10,
-        std::bind(&GapFollowNode::gap_callback, this, std::placeholders::_1));
+        "gap", 10, std::bind(&GapFollowNode::gap_callback, this, std::placeholders::_1));
 
     this->declare_parameter("use_fallback_method", false);
     this->declare_parameter("degree", 2);
@@ -16,27 +14,23 @@ GapFollowNode::GapFollowNode() : Node("gap_follow_node")
     this->declare_parameter("lookahead_distance", 1.5);
 
     use_fallback_method = this->get_parameter("use_fallback_method").as_bool();
-    RCLCPP_INFO(this->get_logger(), "Using follow method: '%s'", use_fallback_method ? "drive_best_point" : "least_squares");
+    RCLCPP_INFO(this->get_logger(), "Using follow method: '%s'",
+                use_fallback_method ? "drive_best_point" : "least_squares");
 
     degree = this->get_parameter("degree").as_int();
     steering_gain = this->get_parameter("steering_gain").as_double();
     lookahead_distance = this->get_parameter("lookahead_distance").as_double();
 }
 
-void GapFollowNode::gap_callback(const reactive::msg::Gap::ConstSharedPtr gap_msg)
-{
-    if (use_fallback_method)
-    {
+void GapFollowNode::gap_callback(const reactive::msg::Gap::ConstSharedPtr gap_msg) {
+    if (use_fallback_method) {
         drive_best_point(gap_msg);
-    }
-    else
-    {
+    } else {
         least_squares_pathfinding(gap_msg);
     }
 }
 
-void GapFollowNode::drive_best_point(const reactive::msg::Gap::ConstSharedPtr gap_msg)
-{
+void GapFollowNode::drive_best_point(const reactive::msg::Gap::ConstSharedPtr gap_msg) {
     // Speed depends on target point range
     float velocity;
     float target_range = gap_msg->target_range;
@@ -57,12 +51,12 @@ void GapFollowNode::drive_best_point(const reactive::msg::Gap::ConstSharedPtr ga
     drive_pub_->publish(drive_msg);
 }
 
-void GapFollowNode::least_squares_pathfinding(const reactive::msg::Gap::ConstSharedPtr gap_msg)
-{
-
-    if (static_cast<int>(gap_msg->ranges.size()) < degree + 1)
-    {
-        RCLCPP_WARN(this->get_logger(), "Not enough gap points to fit degree-%d polynomial. Falling back to drive_best_point", degree);
+void GapFollowNode::least_squares_pathfinding(const reactive::msg::Gap::ConstSharedPtr gap_msg) {
+    if (static_cast<int>(gap_msg->ranges.size()) < degree + 1) {
+        RCLCPP_WARN(
+            this->get_logger(),
+            "Not enough gap points to fit degree-%d polynomial. Falling back to drive_best_point",
+            degree);
         drive_best_point(gap_msg);
         return;
     }
@@ -71,10 +65,10 @@ void GapFollowNode::least_squares_pathfinding(const reactive::msg::Gap::ConstSha
     Eigen::VectorXd x(gap_msg->ranges.size());
     Eigen::VectorXd y(gap_msg->ranges.size());
 
-    for (int i = 0; i < gap_msg->ranges.size(); i++)
-    {
+    for (int i = 0; i < gap_msg->ranges.size(); i++) {
         // Convert polar coordinates to cartesian coordinates
-        std::pair<double, double> coordinate = polar_to_cartesian(gap_msg->ranges[i], gap_msg->angles[i]);
+        std::pair<double, double> coordinate =
+            polar_to_cartesian(gap_msg->ranges[i], gap_msg->angles[i]);
         x(i) = coordinate.first;
         y(i) = coordinate.second;
     }
@@ -98,22 +92,18 @@ void GapFollowNode::least_squares_pathfinding(const reactive::msg::Gap::ConstSha
     drive_pub_->publish(drive_msg);
 }
 
-std::pair<double, double> GapFollowNode::polar_to_cartesian(double r, double theta)
-{
+std::pair<double, double> GapFollowNode::polar_to_cartesian(double r, double theta) {
     return std::pair<double, double>(r * std::cos(theta), r * std::sin(theta));
 }
 
-Eigen::VectorXd GapFollowNode::fit_polynomial(const Eigen::VectorXd &x, const Eigen::VectorXd &y)
-{
+Eigen::VectorXd GapFollowNode::fit_polynomial(const Eigen::VectorXd &x, const Eigen::VectorXd &y) {
     int n = x.size();
     Eigen::MatrixXd A(n, degree + 1);
 
     // Build Vandermonde matrix
-    for (int i = 0; i < n; ++i)
-    {
+    for (int i = 0; i < n; ++i) {
         double val = 1.0;
-        for (int j = 0; j <= degree; ++j)
-        {
+        for (int j = 0; j <= degree; ++j) {
             A(i, j) = val;
             val *= x(i);
         }
@@ -125,18 +115,16 @@ Eigen::VectorXd GapFollowNode::fit_polynomial(const Eigen::VectorXd &x, const Ei
     return coeffs;
 }
 
-double GapFollowNode::get_curve_output(double x, Eigen::VectorXd coefficients)
-{
+double GapFollowNode::get_curve_output(double x, Eigen::VectorXd coefficients) {
     double y = 0.0;
-    for (int i = 0; i < degree + 1; i++) // make sure to factor in constant term
+    for (int i = 0; i < degree + 1; i++)  // make sure to factor in constant term
     {
         y += coefficients[i] * (std::pow(x, i));
     }
     return y;
 }
 
-double GapFollowNode::compute_steering_angle_simple(Eigen::VectorXd coefficients, double target_x)
-{
+double GapFollowNode::compute_steering_angle_simple(Eigen::VectorXd coefficients, double target_x) {
     double target_y = get_curve_output(target_x, coefficients);
     double alpha = std::atan2(target_y, target_x);
 
@@ -144,13 +132,12 @@ double GapFollowNode::compute_steering_angle_simple(Eigen::VectorXd coefficients
     return std::clamp(steering_angle, -max_steering_angle, max_steering_angle);
 }
 
-double GapFollowNode::angle_to_speed_function(double angle)
-{
-    return -1.6 * std::log(angle + 0.3) + 2.4; // current formula from Desmos tinkering <https://www.desmos.com/calculator/ijolz4pnpy>
+double GapFollowNode::angle_to_speed_function(double angle) {
+    return -1.6 * std::log(angle + 0.3) + 2.4;  // current formula from Desmos tinkering
+                                                // <https://www.desmos.com/calculator/ijolz4pnpy>
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
     rclcpp::spin(std::make_shared<GapFollowNode>());
     rclcpp::shutdown();

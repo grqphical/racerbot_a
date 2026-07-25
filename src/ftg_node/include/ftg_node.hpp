@@ -1,15 +1,14 @@
+#include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
-#include "nav_msgs/msg/odometry.hpp"
-#include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 
 /// @brief The ROS node responsible for controlling the car with Follow The Gap
-class FollowTheGapNode : public rclcpp::Node
-{
-public:
+class FollowTheGapNode : public rclcpp::Node {
+   public:
     FollowTheGapNode();
 
-private:
+   private:
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_msg_publisher;
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_scan_subscriber;
 
