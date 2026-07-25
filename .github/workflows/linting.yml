@@ -7,6 +7,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ros:humble-ros-base
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
