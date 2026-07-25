@@ -8,16 +8,18 @@ Checks: >
   readability-*,
   -modernize-use-trailing-return-type,
   -readability-magic-numbers
+  clang-analyzer-*
+  -cppcoreguidelines-avoid-magic-numbers
 
 WarningsAsErrors: 'bugprone-*,performance-*'
 
 # Quoted regex ensures valid YAML and matches headers inside your package path
-HeaderFilterRegex: '.*src/racerbot_a/.*'
+HeaderFilterRegex: '^.*src/racerbot_a/include/.*'
 
 # Check options dictionary must use key/value string mapping
 CheckOptions:
   readability-identifier-naming.ClassCase: 'CamelCase'
   readability-identifier-naming.FunctionCase: 'lower_case'
   readability-identifier-naming.MemberSuffix: '_'
-  readability-function-size.LineThreshold: '100'
+  readability-function-size.LineThreshold: 100
 ...
