@@ -17,11 +17,11 @@ jobs:
           apt-get update
           apt-get install -y clang-format clang-tidy
           rosdep update
-          rosdep install -i --from-paths src --rosdistro humble -y
+          rosdep install -i --from-paths ros_ws/racerbot_a/src --rosdistro humble -y
       - name: Check clang-format
         run: |
           # Checks all C/C++ files; fails if any formatting diff is found
-          find ros_ws/src/my_repo -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h' \) | \
+          find ros_ws/src/racerbot_a -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h' \) | \
           xargs clang-format --dry-run --Werror
 
       - name: Compile and Run clang-tidy
