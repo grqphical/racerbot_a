@@ -25,4 +25,3 @@ CheckOptions:
     value: '_'
   - key: readability-function-size.LineThreshold
     value: '100'
-...
