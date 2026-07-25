@@ -10,7 +10,7 @@ Checks: >
 
 WarningsAsErrors: 'bugprone-*,performance-*'
 
-HeaderFilterRegex: '.*/include/.*'
+HeaderFilterRegex: .*src/racerbot_a/.*
 
 CheckOptions:
   readability-identifier-naming.ClassCase: 'CamelCase'

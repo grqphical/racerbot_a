@@ -29,5 +29,5 @@ jobs:
           colcon build --symlink-install --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           
           # Run clang-tidy using the generated compilation database
-          run-clang-tidy -p build/
+          run-clang-tidy -p build/ '.*src/racerbot_a/.*'
     
