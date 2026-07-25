@@ -1,0 +1,19 @@
+Checks: >
+  -*,
+  bugprone-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers
+
+WarningsAsErrors: 'bugprone-*,performance-*'
+
+HeaderFilterRegex: '.*/include/.*'
+
+CheckOptions:
+  readability-identifier-naming.ClassCase: 'CamelCase'
+  readability-identifier-naming.FunctionCase: 'lower_case'
+  readability-identifier-naming.MemberSuffix: '_'
+  readability-function-size.LineThreshold: 100

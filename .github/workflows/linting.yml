@@ -1,0 +1,36 @@
+name: Linting
+
+on: [push, pull_request]
+
+jobs:
+  linter:
+    runs-on: ubuntu-latest
+    container:
+      image: ros:humble-ros-base
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: src/racerbot_a
+      - name: Install clang tools & dependencies
+        run: |
+          apt-get update
+          apt-get install -y clang-format clang-tidy
+          rosdep update
+          rosdep install -i --from-paths ros_ws/src --rosdistro jazzy -y
+      - name: Check clang-format
+        run: |
+          # Checks all C/C++ files; fails if any formatting diff is found
+          find ros_ws/src/my_repo -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h' \) | \
+          xargs clang-format --dry-run --Werror
+
+      - name: Compile and Run clang-tidy
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          cd ros_ws
+          # CMAKE_EXPORT_COMPILE_COMMANDS generates compile_commands.json needed for clang-tidy
+          colcon build --symlink-install --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          
+          # Run clang-tidy using the generated compilation database
+          run-clang-tidy -p build/
+    
