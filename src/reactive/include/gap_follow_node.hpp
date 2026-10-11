@@ -31,9 +31,9 @@ private:
     double speed_curve_scale_ = 1.0;
     double max_slew_rate_ = deg2rad(170.0);
     /// @brief Switch to fallback when |target_angle| rises above this angle...
-    double obstacle_enter_angle_ = deg2rad(18.0);
+    double obstacle_enter_angle_ = deg2rad(12.0);
     /// @brief ...and only switch back to least squares once it drops below this one (hysteresis).
-    double obstacle_exit_angle_ = deg2rad(12.0);
+    double obstacle_exit_angle_ = deg2rad(8.0);
 
     double filtered_steering_angle_ = 0.0;
     double commanded_steering_angle_ = 0.0;

@@ -78,12 +78,12 @@ def generate_launch_description():
     )
     obstacle_enter_angle = DeclareLaunchArgument(
         "obstacle_enter_angle",
-        default_value="18.0",
+        default_value="12.0",
         desription="At what angle should the algorithim switch to the fallback method because there is an obstacle in front of it"
     )
     obstacle_exit_angle = DeclareLaunchArgument(
             "obstacle_exit_angle",
-            default_value="12.0",
+            default_value="8.0",
             desription="At what angle should the algorithim switch to the least squares method because there is no longer an obstacle in front of it"
         )
 
