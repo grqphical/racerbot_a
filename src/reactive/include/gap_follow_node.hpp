@@ -7,8 +7,8 @@
 #include <Eigen/Dense>
 #include <limits>
 
-#define DEG2RAD(x) x *(M_PI / 180.0)
-#define RAD2DEG(x) x * (180.0 / M_PI)
+constexpr double deg2rad(double deg) { return deg * (M_PI / 180.0); }
+constexpr double rad2deg(double rad) { return rad * (180.0 / M_PI); }
 
 class GapFollowNode : public rclcpp::Node
 {
@@ -24,23 +24,28 @@ private:
     int degree_ = 2;
     double steering_gain_ = 1.0;
     double k_samples_ = 200;
-    double max_steering_angle_ = DEG2RAD(45.0f);
+    double max_steering_angle_ = deg2rad(45.0f);
     double max_speed_ = 3.5;
     double min_speed_ = 0.25;
     double hysteresis_alpha_ = 0.3;
     double speed_curve_scale_ = 1.0;
     double max_slew_rate_ = 0.1;
-    /// @brief Determines how many degrees from the center the median angle of the gap should be
-    /// for the algorithim to use least squares.
-    double max_obstacle_deviation_angle_ = DEG2RAD(25.0);
+    /// @brief Switch to fallback when |target_angle| rises above this angle...
+    double obstacle_enter_angle_ = deg2rad(25.0);
+    /// @brief ...and only switch back to least squares once it drops below this one (hysteresis).
+    double obstacle_exit_angle_ = deg2rad(15.0);
 
     double filtered_steering_angle_ = 0.0;
     double commanded_steering_angle_ = 0.0;
     double last_callback_time_ = 0.0;
+    bool in_fallback_ = false;
 
     /// @brief Callback invoked each time we find a valid gap from the laser scan.
     /// @param gap_msg Shared pointer to the incoming Gap message.
     void gap_callback(const reactive::msg::Gap::ConstSharedPtr gap_msg);
+
+    /// @brief Returns time since last callback in seconds, clamped to a sane range.
+    double update_dt();
 
     /// @brief Baseline method that publishes to drive, driving to the best gap found in the gap_msg.
     /// @param gap_msg Shared pointer to the incoming Gap message.
@@ -48,7 +53,8 @@ private:
 
     /// @brief Uses the method of least squares to determine a curve the car should follow based on the gap it recieves.
     /// @param gap_msg Shared pointer to the incoming Gap message.
-    void least_squares_pathfinding(const reactive::msg::Gap::ConstSharedPtr gap_msg);
+    /// @param dt Current delta time (time from now till last callback)
+    void least_squares_pathfinding(const reactive::msg::Gap::ConstSharedPtr gap_msg, double dt);
 
     /// @brief Determine coefficients for the best fitting curve, given a set of inputs (X coordinates) and outputs (Y coordinates)
     /// @param x Vector of X coordinates
@@ -67,7 +73,7 @@ private:
     /// @param theta Vector of angles in the gap
     /// @param max_lookahead The maximum lookahead distance that the value should be clamped too
     /// @returns The angle the car should steer
-    double compute_steering_angle(Eigen::VectorXd coefficients, Eigen::VectorXd theta, double max_lookahead);
+    std::optional<double> compute_steering_angle(Eigen::VectorXd coefficients, Eigen::VectorXd theta, double max_lookahead);
 
     /// @brief The mathematical function that determines the car's speed based on the target_angle
     /// @param angle The target angle

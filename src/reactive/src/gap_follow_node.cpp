@@ -27,7 +27,7 @@ GapFollowNode::GapFollowNode() : Node("gap_follow_node")
     degree_ = this->get_parameter("degree").as_int();
     steering_gain_ = this->get_parameter("steering_gain").as_double();
     k_samples_ = this->get_parameter("k_samples").as_int();
-    max_steering_angle_ = DEG2RAD(this->get_parameter("max_steering_angle").as_double());
+    max_steering_angle_ = deg2rad(this->get_parameter("max_steering_angle").as_double());
     max_speed_ = this->get_parameter("max_speed").as_double();
     min_speed_ = this->get_parameter("min_speed").as_double();
     hysteresis_alpha_ = this->get_parameter("hysteresis_alpha").as_double();
@@ -37,20 +37,23 @@ GapFollowNode::GapFollowNode() : Node("gap_follow_node")
 
 void GapFollowNode::gap_callback(const reactive::msg::Gap::ConstSharedPtr gap_msg)
 {
-    if (use_fallback_method_)
+    const double dt = update_dt();
+
+    if (use_fallback_method_ || obstacle_detected(gap_msg))
     {
         drive_best_point(gap_msg);
         return;
     }
 
-    if (obstacle_detected(gap_msg))
-    {
-        RCLCPP_INFO(this->get_logger(), "Obstacle detected, switching to fallback. Gap centered around %.2f degrees.", RAD2DEG(gap_msg->target_angle));
-        drive_best_point(gap_msg);
-        return;
-    }
+    least_squares_pathfinding(gap_msg, dt);
+}
 
-    least_squares_pathfinding(gap_msg);
+double GapFollowNode::update_dt()
+{
+    const double now_sec = this->now().seconds();
+    const double dt = (last_callback_time_ > 0.0) ? (now_sec - last_callback_time_) : 0.02;
+    last_callback_time_ = now_sec; // updated on EVERY callback, regardless of which method runs
+    return std::clamp(dt, 1e-3, 0.1);
 }
 
 void GapFollowNode::drive_best_point(const reactive::msg::Gap::ConstSharedPtr gap_msg)
@@ -58,6 +61,7 @@ void GapFollowNode::drive_best_point(const reactive::msg::Gap::ConstSharedPtr ga
     // Speed depends on target point range
     float velocity;
     float target_range = gap_msg->target_range;
+    const double steering = std::clamp<double>(gap_msg->target_angle, -max_steering_angle_, max_steering_angle_);
 
     /* Slower speed at small range
     double min_range = 0.5;
@@ -86,12 +90,15 @@ void GapFollowNode::drive_best_point(const reactive::msg::Gap::ConstSharedPtr ga
     // Publishing to drive
     ackermann_msgs::msg::AckermannDriveStamped drive_msg;
     drive_msg.header.stamp = this->now();
-    drive_msg.drive.steering_angle = gap_msg->target_angle;
+    drive_msg.drive.steering_angle = steering;
     drive_msg.drive.speed = velocity;
     drive_pub_->publish(drive_msg);
+
+    filtered_steering_angle_ = steering;
+    commanded_steering_angle_ = steering;
 }
 
-void GapFollowNode::least_squares_pathfinding(const reactive::msg::Gap::ConstSharedPtr gap_msg)
+void GapFollowNode::least_squares_pathfinding(const reactive::msg::Gap::ConstSharedPtr gap_msg, double dt)
 {
 
     if (static_cast<int>(gap_msg->ranges.size()) < degree_ + 1)
@@ -124,11 +131,14 @@ void GapFollowNode::least_squares_pathfinding(const reactive::msg::Gap::ConstSha
     // Determine polynomial coefficients
     Eigen::VectorXd coefficients = fit_polynomial(theta, r);
 
-    double steering_angle = compute_steering_angle(coefficients, theta, max_lookahead);
+    std::optional<double> raw_steering_angle = compute_steering_angle(coefficients, theta, max_lookahead);
 
-    double now_sec = this->now().seconds();
-    double dt = (last_callback_time_ > 0.0) ? (now_sec - last_callback_time_) : 0.02;
-    last_callback_time_ = now_sec;
+    if (!raw_steering_angle.has_value())
+    {
+        drive_best_point(gap_msg);
+        return;
+    }
+    double steering_angle = raw_steering_angle.value();
 
     filtered_steering_angle_ = hysteresis_alpha_ * steering_angle + (1 - hysteresis_alpha_) * filtered_steering_angle_;
 
@@ -178,24 +188,33 @@ double GapFollowNode::get_curve_output(double x, Eigen::VectorXd coefficients)
     return y;
 }
 
-double GapFollowNode::compute_steering_angle(Eigen::VectorXd coefficients, Eigen::VectorXd theta, double max_lookahead)
+std::optional<double> GapFollowNode::compute_steering_angle(Eigen::VectorXd coefficients, Eigen::VectorXd theta, double max_lookahead)
 {
-    double theta_min = std::max(theta.minCoeff(), -max_steering_angle_);
-    double theta_max = std::min(theta.maxCoeff(), max_steering_angle_);
+    const double theta_min = std::max(theta.minCoeff(), -max_steering_angle_);
+    const double theta_max = std::min(theta.maxCoeff(), max_steering_angle_);
 
-    double best_theta = theta_min;
+    if (theta_min >= theta_max)
+        return std::nullopt;
+
+    constexpr double eps = 1e-6;
+    double best_theta = 0.5 * (theta_min + theta_max);
     double best_range = -std::numeric_limits<double>::max();
 
     for (int i = 0; i <= k_samples_; i++)
     {
-        double t = theta_min + (theta_max - theta_min) * i / k_samples_;
-        double predicted_r = get_curve_output(t, coefficients);
-        if (predicted_r >= max_lookahead)
-            continue;
+        const double t = theta_min + (theta_max - theta_min) * i / k_samples_;
 
-        if (predicted_r > best_range)
+        // Clamp (don't skip!) predictions that overshoot what the LiDAR actually saw
+        const double predicted_r = std::min(get_curve_output(t, coefficients), max_lookahead);
+
+        if (predicted_r > best_range + eps)
         {
             best_range = predicted_r;
+            best_theta = t;
+        }
+        else if (std::abs(predicted_r - best_range) <= eps && std::abs(t) < std::abs(best_theta))
+        {
+            // Tie (e.g. a plateau at max_lookahead): prefer the straightest option
             best_theta = t;
         }
     }
@@ -215,7 +234,22 @@ double GapFollowNode::angle_to_speed_function(double angle)
 
 bool GapFollowNode::obstacle_detected(const reactive::msg::Gap::ConstSharedPtr gap_msg)
 {
-    return std::abs(gap_msg->target_angle) > this->max_obstacle_deviation_angle_;
+    const double deviation = std::abs(gap_msg->target_angle);
+    const bool was_fallback = in_fallback_;
+
+    // hysteresis so we don't chatter between methods
+    if (in_fallback_ && deviation < obstacle_exit_angle_)
+        in_fallback_ = false;
+    else if (!in_fallback_ && deviation > obstacle_enter_angle_)
+        in_fallback_ = true;
+
+    if (in_fallback_ != was_fallback)
+    {
+        RCLCPP_INFO(this->get_logger(), "Switching to %s (gap centered at %.1f deg)",
+                    in_fallback_ ? "fallback (best point)" : "least squares",
+                    rad2deg(gap_msg->target_angle));
+    }
+    return in_fallback_;
 }
 
 int main(int argc, char **argv)
