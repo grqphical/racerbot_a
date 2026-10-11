@@ -19,9 +19,9 @@ GapFollowNode::GapFollowNode() : Node("gap_follow_node")
     this->declare_parameter("min_speed", 0.5);
     this->declare_parameter("hysteresis_alpha", 0.3);
     this->declare_parameter("speed_curve_scale", 1.0);
-    this->declare_parameter("max_slew_rate", deg2rad(170.0));
-    this->declare_parameter("obstacle_enter_angle", deg2rad(12.0));
-    this->declare_parameter("obstacle_exit_angle", deg2rad(18.0));
+    this->declare_parameter("max_slew_rate", 170.0);
+    this->declare_parameter("obstacle_enter_angle", 12.0);
+    this->declare_parameter("obstacle_exit_angle", 18.0);
 
     use_fallback_method_ = this->get_parameter("use_fallback_method").as_bool();
     RCLCPP_INFO(this->get_logger(), "Using follow method: '%s'", use_fallback_method_ ? "drive_best_point" : "least_squares");
