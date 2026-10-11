@@ -19,7 +19,7 @@ GapFollowNode::GapFollowNode() : Node("gap_follow_node")
     this->declare_parameter("min_speed", 0.5);
     this->declare_parameter("hysteresis_alpha", 0.3);
     this->declare_parameter("speed_curve_scale", 1.0);
-    this->declare_parameter("max_slew_rate", 170.0);
+    this->declare_parameter("max_slew_rate", deg2rad(170.0));
 
     use_fallback_method_ = this->get_parameter("use_fallback_method").as_bool();
     RCLCPP_INFO(this->get_logger(), "Using follow method: '%s'", use_fallback_method_ ? "drive_best_point" : "least_squares");
@@ -32,7 +32,7 @@ GapFollowNode::GapFollowNode() : Node("gap_follow_node")
     min_speed_ = this->get_parameter("min_speed").as_double();
     hysteresis_alpha_ = this->get_parameter("hysteresis_alpha").as_double();
     speed_curve_scale_ = this->get_parameter("speed_curve_scale").as_double();
-    max_slew_rate_ = this->get_parameter("max_slew_rate").as_double();
+    max_slew_rate_ = deg2rad(this->get_parameter("max_slew_rate").as_double());
 }
 
 void GapFollowNode::gap_callback(const reactive::msg::Gap::ConstSharedPtr gap_msg)
@@ -142,12 +142,18 @@ void GapFollowNode::least_squares_pathfinding(const reactive::msg::Gap::ConstSha
 
     filtered_steering_angle_ = hysteresis_alpha_ * steering_angle + (1 - hysteresis_alpha_) * filtered_steering_angle_;
 
-    double max_delta = max_slew_rate_ * dt; // new param, rad/sec
-    double delta = std::clamp(filtered_steering_angle_ - commanded_steering_angle_, -max_delta, max_delta);
-    commanded_steering_angle_ = std::clamp(commanded_steering_angle_ + delta, -max_steering_angle_, max_steering_angle_);
+    // apply hysteresis
+    const double desired = std::clamp(steering_gain_ * raw_steering_angle.value(),
+                                      -max_steering_angle_, max_steering_angle_);
 
-    double velocity = angle_to_speed_function(filtered_steering_angle_);
-    commanded_steering_angle_ = steering_gain_ * filtered_steering_angle_;
+    filtered_steering_angle_ = hysteresis_alpha_ * desired + (1.0 - hysteresis_alpha_) * filtered_steering_angle_;
+
+    const double max_delta = max_slew_rate_ * dt;
+    const double delta = std::clamp(filtered_steering_angle_ - commanded_steering_angle_, -max_delta, max_delta);
+    commanded_steering_angle_ = std::clamp(commanded_steering_angle_ + delta,
+                                           -max_steering_angle_, max_steering_angle_);
+
+    const double velocity = angle_to_speed_function(commanded_steering_angle_);
 
     ackermann_msgs::msg::AckermannDriveStamped drive_msg;
     drive_msg.header.stamp = this->now();
