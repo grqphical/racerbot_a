@@ -76,6 +76,16 @@ def generate_launch_description():
         default_value="170.0",
         description="Maximum rate of change of commanded steering angle, in degrees/sec.",
     )
+    obstacle_enter_angle = DeclareLaunchArgument(
+        "obstacle_enter_angle",
+        default_value="18.0",
+        desription="At what angle should the algorithim switch to the fallback method because there is an obstacle in front of it"
+    )
+    obstacle_exit_angle = DeclareLaunchArgument(
+            "obstacle_exit_angle",
+            default_value="12.0",
+            desription="At what angle should the algorithim switch to the least squares method because there is no longer an obstacle in front of it"
+        )
 
     return LaunchDescription(
         [
@@ -91,6 +101,8 @@ def generate_launch_description():
             hysteresis_alpha,
             speed_curve_scale,
             max_slew_rate,
+            obstacle_enter_angle,
+            obstacle_exit_angle,
             # Launch gap_finder_node
             Node(
                 package="reactive",
@@ -120,6 +132,8 @@ def generate_launch_description():
                         "hysteresis_alpha": LaunchConfiguration("hysteresis_alpha"),
                         "speed_curve_scale": LaunchConfiguration("speed_curve_scale"),
                         "max_slew_rate": LaunchConfiguration("max_slew_rate"),
+                        "obstacle_enter_angle": LaunchConfiguration("obstacle_enter_angle"),
+                        "obstacle_exit_angle": LaunchConfiguration("obstacle_exit_angle"),
                     }
                 ],
             ),
