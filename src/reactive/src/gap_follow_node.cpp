@@ -145,7 +145,6 @@ void GapFollowNode::least_squares_pathfinding(const reactive::msg::Gap::ConstSha
         drive_best_point(gap_msg);
         return;
     }
-    double steering_angle = raw_steering_angle.value();
 
     // apply hysteresis
     const double desired = std::clamp(steering_gain_ * raw_steering_angle.value(),
