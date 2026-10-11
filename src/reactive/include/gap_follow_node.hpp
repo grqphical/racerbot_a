@@ -8,6 +8,7 @@
 #include <limits>
 
 #define DEG2RAD(x) x *(M_PI / 180.0)
+#define RAD2DEG(x) x * (180.0 / M_PI)
 
 class GapFollowNode : public rclcpp::Node
 {
@@ -29,11 +30,13 @@ private:
     double hysteresis_alpha_ = 0.3;
     double speed_curve_scale_ = 1.0;
     double max_slew_rate_ = 0.1;
+    /// @brief Determines how many degrees from the center the median angle of the gap should be
+    /// for the algorithim to use least squares.
+    double max_obstacle_deviation_angle_ = DEG2RAD(25.0);
 
     double filtered_steering_angle_ = 0.0;
     double commanded_steering_angle_ = 0.0;
     double last_callback_time_ = 0.0;
-
 
     /// @brief Callback invoked each time we find a valid gap from the laser scan.
     /// @param gap_msg Shared pointer to the incoming Gap message.
@@ -70,4 +73,9 @@ private:
     /// @param angle The target angle
     /// @return The speed the car should drive at
     double angle_to_speed_function(double angle);
+
+    /// @brief Determines if the furthest point (target_angle in gap_msg) is outside the range of angles where the car has no obstacles in front of it.
+    /// @param gap_msg The gap message
+    /// @return A boolean indicating if an obstacle was detecting meaning the gap is not in front of the car
+    bool obstacle_detected(const reactive::msg::Gap::ConstSharedPtr gap_msg);
 };

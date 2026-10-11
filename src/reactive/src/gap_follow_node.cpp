@@ -40,11 +40,17 @@ void GapFollowNode::gap_callback(const reactive::msg::Gap::ConstSharedPtr gap_ms
     if (use_fallback_method_)
     {
         drive_best_point(gap_msg);
+        return;
     }
-    else
+
+    if (obstacle_detected(gap_msg))
     {
-        least_squares_pathfinding(gap_msg);
+        RCLCPP_INFO(this->get_logger(), "Obstacle detected, switching to fallback. Gap centered around %.2f degrees.", RAD2DEG(gap_msg->target_angle));
+        drive_best_point(gap_msg);
+        return;
     }
+
+    least_squares_pathfinding(gap_msg);
 }
 
 void GapFollowNode::drive_best_point(const reactive::msg::Gap::ConstSharedPtr gap_msg)
@@ -184,7 +190,8 @@ double GapFollowNode::compute_steering_angle(Eigen::VectorXd coefficients, Eigen
     {
         double t = theta_min + (theta_max - theta_min) * i / k_samples_;
         double predicted_r = get_curve_output(t, coefficients);
-        if (predicted_r >= max_lookahead) continue;
+        if (predicted_r >= max_lookahead)
+            continue;
 
         if (predicted_r > best_range)
         {
@@ -204,6 +211,11 @@ double GapFollowNode::angle_to_speed_function(double angle)
 
     double y = speed_curve_scale_ * (a * std::log(std::abs(angle) + b) + c); // current formula from Desmos tinkering <https://www.desmos.com/calculator/yeyvbi21nf>
     return std::clamp(y, min_speed_, max_speed_);
+}
+
+bool GapFollowNode::obstacle_detected(const reactive::msg::Gap::ConstSharedPtr gap_msg)
+{
+    return std::abs(gap_msg->target_angle) > this->max_obstacle_deviation_angle_;
 }
 
 int main(int argc, char **argv)
